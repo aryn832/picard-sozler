@@ -1,6 +1,9 @@
-[plugin]
+uuid = "a3f12345-6789-4abc-def0-123456789abc"
 name = "Sözler"
-version = "1.0"
-api_versions = ["2.0", "3.0"]
-author = "Deniz Özdemir"
-description = "Fetch lyrics from LRCLIB"
+description = "Fetch Japanese and synced lyrics from LRCLIB"
+api = ["2.0", "3.0"]
+version = "1.0.0"
+license = "GPL-3.0-or-later"
+
+[authors]
+"Deniz Özdemir" = ""
