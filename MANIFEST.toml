@@ -1,7 +1,8 @@
 uuid = "f47ac10b-58cc-4372-a567-0e02b2c3d479"
 name = "Sözler"
-description = "Fetch Japanese and synced lyrics from LRCLIB"
+title = "Fetch Lyrics from LRCLIB"
+description = "Fetches synchronized and plain lyrics from LRCLIB for any track, artist, or album with sequential rate-limit handling."
 api = ["2.0", "3.0"]
 version = "1.0.0"
 license = "GPL-3.0-or-later"
-authors = ["Deniz Özdemir"]
+authors = ["Deniz Özdemir", "Aryn"]
