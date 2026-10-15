@@ -23,28 +23,29 @@ def process_search_response(api, file, data, reply, error):
 		api.logger.info(f"Sözler: Successfully added lyrics to {file.filename}")
 
 
-def process_file(api, file):
-	metadata = file.metadata
-	artist = metadata.get("artist") or metadata.get("albumartist") or ""
-	title = metadata.get("title") or ""
-	
-	if not title:
-		return
+def fetch_lyrics_menu(api, files):
+	for file in files:
+		metadata = file.metadata
+		artist = metadata.get("artist") or metadata.get("albumartist") or ""
+		title = metadata.get("title") or ""
+		
+		if not title:
+			continue
 
-	search_query = f"{artist} {title}".strip()
-	api.logger.debug(f"Sözler: Searching LRCLIB for: {search_query}")
+		search_query = f"{artist} {title}".strip()
+		api.logger.debug(f"Sözler: Searching LRCLIB for: {search_query}")
 
-	# Add a brief pause to prevent HTTP 429 rate limit errors
-	time.sleep(0.5)
+		# Throttling to prevent HTTP 429 rate limits during batch calls
+		time.sleep(0.5)
 
-	file.tagger.webservice.get_url(
-		url="https://lrclib.net/api/search",
-		handler=partial(process_search_response, api, file),
-		parse_response_type='json',
-		queryargs={"q": search_query},
-	)
+		file.tagger.webservice.get_url(
+			url="https://lrclib.net/api/search",
+			handler=partial(process_search_response, api, file),
+			parse_response_type='json',
+			queryargs={"q": search_query},
+		)
 
 
 def enable(api):
 	"""Entry point for Picard 3.x plugins."""
-	api.register_file_post_load_processor(process_file)
+	api.register_file_action("Fetch Lyrics from LRCLIB", fetch_lyrics_menu)
