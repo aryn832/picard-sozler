@@ -9,16 +9,16 @@
 
 PLUGIN_NAME = "Picard Sözler"
 PLUGIN_AUTHOR = "Deniz Engin <dev@dilbil.im>"
-PLUGIN_DESCRIPTION = "Sözler is a lyrics fetcher for Picard. It uses the public API provided by the lrclib.net project, which requires no registration or API keys! The API provides synced lyrics and unsynced ones as a fallback. We prioritize the syced ones. The lrclib project does not utilize MB IDs, so the results may not be as accurate. It is recommended to glimpse over your lyrics when tagging."
-PLUGIN_VERSION = "0.0.2"
-PLUGIN_API_VERSIONS = ["2.1"]
+PLUGIN_DESCRIPTION = "Sözler is a lyrics fetcher for Picard. It uses the public API provided by the lrclib.net project, which requires no registration or API keys! The API provides synced lyrics and unsynced ones as a fallback. We prioritize the synced ones."
+PLUGIN_VERSION = "0.0.3"
+PLUGIN_API_VERSIONS = ["2.1", "3.0"]
 PLUGIN_LICENSE = "GPL-3.0-or-later"
 PLUGIN_LICENSE_URL = "https://www.gnu.org/licenses/gpl-3.0-standalone.html"
 
 from functools import partial
 import json
 
-from picard.metadata import register_track_metadata_processor
+from picard.file import register_file_post_load_processor
 from picard import log
 
 
@@ -30,10 +30,8 @@ def log_err(s):
 	log.error(f"{PLUGIN_NAME}: {s}")
 
 
-def process_response(album, metadata, data, reply, error):
+def process_response(file, data, reply, error):
 	if error:
-		album._requests -= 1
-		album._finalize_loading(None)
 		return
 
 	try:
@@ -48,29 +46,32 @@ def process_response(album, metadata, data, reply, error):
 			lyrics = data.get("syncedLyrics") or data.get("plainLyrics")
 
 		if lyrics is not None:
-			metadata["lyrics"] = lyrics
+			file.metadata["lyrics"] = lyrics
 	except AttributeError:
 		log_err(f"api malformed response: {data}")
-	finally:
-		album._requests -= 1
-		album._finalize_loading(None)
 
 
-def process_track(album, metadata, track, __):
-	(mins, secs) = map(int, metadata["~length"].split(":"))
+def process_file(file):
+	metadata = file.metadata
+	length_ms = metadata.get("~length", 0)
+	try:
+		duration = int(length_ms) // 1000
+	except (ValueError, TypeError):
+		duration = 0
+
 	query = {
-		"artist_name": metadata["albumartist"] or metadata["artist"],
-		"album_name": metadata["album"],
-		"track_name": metadata["title"],
-		"duration": mins*60 + secs, # accepts seconds only
+		"artist_name": metadata.get("albumartist") or metadata.get("artist", ""),
+		"album_name": metadata.get("album", ""),
+		"track_name": metadata.get("title", ""),
+		"duration": duration,
 	}
 	log_debug(f"trying to query with: {query}")
-	album.tagger.webservice.get_url(
+	file.tagger.webservice.get_url(
 		url="https://lrclib.net/api/get",
-		handler=partial(process_response, album, metadata),
+		handler=partial(process_response, file),
 		parse_response_type='json',
 		queryargs=query,
 	)
-	album._requests += 1
 
-register_track_metadata_processor(process_track)
+
+register_file_post_load_processor(process_file)
