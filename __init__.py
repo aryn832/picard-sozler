@@ -2,14 +2,13 @@
 # License: GPL-3.0-or-later
 
 from functools import partial
-
+import time
 
 def process_search_response(api, file, data, reply, error):
 	if error or not isinstance(data, list) or len(data) == 0:
 		api.logger.debug(f"Sözler: No search results found for {file.filename}")
 		return
 
-	# Take the best matching result from the search list
 	best_match = data[0]
 	api.logger.debug(f"Sözler: Found match '{best_match.get('trackName')}' by '{best_match.get('artistName')}'")
 
@@ -26,8 +25,6 @@ def process_search_response(api, file, data, reply, error):
 
 def process_file(api, file):
 	metadata = file.metadata
-	
-	# Clean search string containing artist and track title
 	artist = metadata.get("artist") or metadata.get("albumartist") or ""
 	title = metadata.get("title") or ""
 	
@@ -37,7 +34,9 @@ def process_file(api, file):
 	search_query = f"{artist} {title}".strip()
 	api.logger.debug(f"Sözler: Searching LRCLIB for: {search_query}")
 
-	# Use /api/search for flexible fuzzy matching
+	# Add a brief pause to prevent HTTP 429 rate limit errors
+	time.sleep(0.5)
+
 	file.tagger.webservice.get_url(
 		url="https://lrclib.net/api/search",
 		handler=partial(process_search_response, api, file),
