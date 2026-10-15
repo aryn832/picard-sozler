@@ -1,51 +1,48 @@
 # Picard Sözler for Picard 3.x
-# Copyright (C) 2024 Deniz Engin <dev@dilbil.im>
 # License: GPL-3.0-or-later
 
 from functools import partial
 
 
-def process_response(api, file, data, reply, error):
-	if error:
+def process_search_response(api, file, data, reply, error):
+	if error or not isinstance(data, list) or len(data) == 0:
+		api.logger.debug(f"Sözler: No search results found for {file.filename}")
 		return
 
-	try:
-		api.logger.debug(f"Sözler: processing response: {data}")
-		instrumental = data.get("instrumental")
-		if instrumental:
-			api.logger.debug("Sözler: instrumental track; skipping")
-			lyrics = None
-		else:
-			lyrics = data.get("syncedLyrics") or data.get("plainLyrics")
+	# Take the best matching result from the search list
+	best_match = data[0]
+	api.logger.debug(f"Sözler: Found match '{best_match.get('trackName')}' by '{best_match.get('artistName')}'")
 
-		if lyrics is not None:
-			file.metadata["lyrics"] = lyrics
-	except AttributeError:
-		api.logger.error(f"Sözler: api malformed response: {data}")
+	instrumental = best_match.get("instrumental")
+	if instrumental:
+		api.logger.debug("Sözler: Instrumental track; skipping")
+		return
+
+	lyrics = best_match.get("syncedLyrics") or best_match.get("plainLyrics")
+	if lyrics:
+		file.metadata["lyrics"] = lyrics
+		api.logger.info(f"Sözler: Successfully added lyrics to {file.filename}")
 
 
 def process_file(api, file):
 	metadata = file.metadata
-	length_ms = metadata.get("~length", 0)
-	try:
-		duration = int(length_ms) // 1000
-	except (ValueError, TypeError):
-		duration = 0
-
-	query = {
-		"artist_name": metadata.get("albumartist") or metadata.get("artist", ""),
-		"album_name": metadata.get("album", ""),
-		"track_name": metadata.get("title", ""),
-		"duration": duration,
-	}
-	api.logger.debug(f"Sözler: querying API with: {query}")
 	
-	# Access Picard's webservice through the file object tagger
+	# Clean search string containing artist and track title
+	artist = metadata.get("artist") or metadata.get("albumartist") or ""
+	title = metadata.get("title") or ""
+	
+	if not title:
+		return
+
+	search_query = f"{artist} {title}".strip()
+	api.logger.debug(f"Sözler: Searching LRCLIB for: {search_query}")
+
+	# Use /api/search for flexible fuzzy matching
 	file.tagger.webservice.get_url(
-		url="https://lrclib.net/api/get",
-		handler=partial(process_response, api, file),
+		url="https://lrclib.net/api/search",
+		handler=partial(process_search_response, api, file),
 		parse_response_type='json',
-		queryargs=query,
+		queryargs={"q": search_query},
 	)
 
 
